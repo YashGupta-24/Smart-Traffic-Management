@@ -27,8 +27,8 @@ async def on_message(ctx:Context, sender: str, msg: AgentCall):
         ctx.logger.info(f"{i} STOP")
         await asyncio.sleep(1)
         if(i==0):
-            print('I am scanning for the density of vehicles')
-            print('I have send the data to llm, and the response will be saved to the time_for_next_cycle')
+            ctx.logger.info('I am scanning for the density of vehicles')
+            ctx.logger.info('I have send the data to llm, and the response will be saved to the time_for_next_cycle')
     await ctx.send(sender, ControlRequest(calculated_time=random.randint(0,15)))
 
 if __name__ == '__main__':
