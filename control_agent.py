@@ -52,6 +52,7 @@ async def on_agent_call(ctx:Context, sender: str, msg: ControlRequest):
         if display_time is None:
             display_time = []
         else:
+            ctx.logger.info(f"Display time: {msg.calculated_time} from agent: {sender}")
             display_time.append(msg.calculated_time)
             ctx.storage.set('display_times', display_time)
 
