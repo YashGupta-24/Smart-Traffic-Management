@@ -15,6 +15,10 @@ south_agent = Agent(name="South Agent", seed="I am the south agent", port=8082, 
 
 fund_agent_if_low(south_agent.wallet.address()) #type: ignore
 
+@south_agent.on_event("shutdown")
+async def shutdown(ctx: Context): 
+    ctx.logger.info("Agent shutting down")
+
 south_agent.include(protocol)
 # control_agent_address='agent1q07zrmw5pcnj0aktmsrdzyl6clp4h7xlddszdartfdezwmdyxjsl7v6ahdf'
 

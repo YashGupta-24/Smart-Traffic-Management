@@ -1,5 +1,6 @@
 from uagents import Agent, Model, Context
 from uagents.setup import fund_agent_if_low
+import asyncio
 
 class AgentCall(Model):
     display_time :int
@@ -22,78 +23,71 @@ upper_time_limit=50
 
 @control_agent.on_event('startup')
 async def initialize(ctx: Context):
-    ctx.storage.set('agent_statuses',{'north':False, 'south':False, 'east':True, 'west':True})
-
-    agent_status = ctx.storage.get('agent_statuses')
-    if agent_status is None:
-        agent_status = {'north':False,'south':False, 'east':True, 'west':True}
-        ctx.storage.set('agent_statuses', agent_status)
+    # Initialize with East-West green, North-South red
+    ctx.storage.set('agent_statuses', {
+        'north': False,  # red
+        'south': False,  # red
+        'east': True,   # green
+        'west': True    # green
+    })
     
-    await ctx.send(north_agent_address, AgentCall(display_time=lower_time_limit, status=agent_status['north']))
-    await ctx.send(south_agent_address, AgentCall(display_time=lower_time_limit, status=agent_status['south']))
-    await ctx.send(east_agent_address, AgentCall(display_time=lower_time_limit, status=agent_status['east']))
-    await ctx.send(west_agent_address, AgentCall(display_time=lower_time_limit, status=agent_status['west']))
-
+    # Send initial signals
+    await send_signals_to_all_agents(ctx, lower_time_limit)
     ctx.logger.info('Initialization complete')
 
-    agent_status['north']=not agent_status['north']
-    agent_status['south']=not agent_status['south']
-    agent_status['east']=not agent_status['east']
-    agent_status['west']=not agent_status['west']
-
-    ctx.storage.set('agent_statuses', agent_status)
-    ctx.storage.set('display_times',[])
-
-@control_agent.on_message(model = ControlRequest)
-async def on_agent_call(ctx:Context, sender: str, msg: ControlRequest):
-    try:
-        display_time = ctx.storage.get('display_times')
-
-        if display_time is None:
-            display_time = []
-        else:
-            ctx.logger.info(f"Display time: {msg.calculated_time} from agent: {sender}")
-            display_time.append(msg.calculated_time)
-            ctx.storage.set('display_times', display_time)
-
-    except:
-        ctx.logger.error('Error in storing display times')
-    
-    if display_time is not None and len(display_time) == 2:
-
-        display_time.sort()
-        ctx.storage.set('display_times', display_time)
-        agent_status = ctx.storage.get('agent_statuses')
-
-        if agent_status is None:
-            agent_status = {'north':False,'south':False, 'east':True, 'west':True}
-            ctx.storage.set('agent_statuses', agent_status)
-
-        if display_time[-1]>upper_time_limit:
-            await ctx.send(north_agent_address, AgentCall(display_time=upper_time_limit, status=agent_status['north']))
-            await ctx.send(south_agent_address, AgentCall(display_time=upper_time_limit, status=agent_status['south']))
-            await ctx.send(east_agent_address, AgentCall(display_time=upper_time_limit, status=agent_status['east']))
-            await ctx.send(west_agent_address, AgentCall(display_time=upper_time_limit, status=agent_status['west']))
-        
-        elif display_time[-1]<lower_time_limit:
-            await ctx.send(north_agent_address, AgentCall(display_time=lower_time_limit, status=agent_status['north']))
-            await ctx.send(south_agent_address, AgentCall(display_time=lower_time_limit, status=agent_status['south']))
-            await ctx.send(east_agent_address, AgentCall(display_time=lower_time_limit, status=agent_status['east']))
-            await ctx.send(west_agent_address, AgentCall(display_time=lower_time_limit, status=agent_status['west']))
-        
-        else:
-            await ctx.send(north_agent_address, AgentCall(display_time=display_time[-1], status=agent_status['north']))
-            await ctx.send(south_agent_address, AgentCall(display_time=display_time[-1], status=agent_status['south']))
-            await ctx.send(east_agent_address, AgentCall(display_time=display_time[-1], status=agent_status['east']))
-            await ctx.send(west_agent_address, AgentCall(display_time=display_time[-1], status=agent_status['west']))
-
-        agent_status['north']=not agent_status['north']
-        agent_status['south']=not agent_status['south']
-        agent_status['east']=not agent_status['east']
-        agent_status['west']=not agent_status['west']
-
+async def send_signals_to_all_agents(ctx: Context, display_time: int):
+    agent_status = ctx.storage.get('agent_statuses')
+    if agent_status is None:
+        agent_status = {'north': False, 'south': False, 'east': True, 'west': True}
         ctx.storage.set('agent_statuses', agent_status)
-        ctx.storage.set('display_times',[])
+
+    # Send signals to all agents simultaneously
+    await asyncio.gather(
+        ctx.send(north_agent_address, AgentCall(display_time=display_time, status=agent_status['north'])),
+        ctx.send(south_agent_address, AgentCall(display_time=display_time, status=agent_status['south'])),
+        ctx.send(east_agent_address, AgentCall(display_time=display_time, status=agent_status['east'])),
+        ctx.send(west_agent_address, AgentCall(display_time=display_time, status=agent_status['west']))
+    )
+
+@control_agent.on_message(model=ControlRequest)
+async def on_agent_call(ctx: Context, sender: str, msg: ControlRequest):
+    try:
+        display_times = ctx.storage.get('display_times')
+        if display_times is None:
+            display_times = []
+        
+        ctx.logger.info(f"Display time: {msg.calculated_time} from agent: {sender}")
+        display_times.append(msg.calculated_time)
+        ctx.storage.set('display_times', display_times)
+
+        # Wait for responses from all agents before switching
+        if len(display_times) == 2:  # All agents have responded
+            # Calculate next timing
+            max_time = max(display_times)
+            next_time = max_time
+            
+            # Clamp time between limits
+            if next_time > upper_time_limit:
+                next_time = upper_time_limit
+            elif next_time < lower_time_limit:
+                next_time = lower_time_limit
+
+            # Switch signal states
+            agent_status = ctx.storage.get('agent_statuses')
+            new_status = {
+                'north': not agent_status['north'],
+                'south': not agent_status['north'],  # Keep in sync with north
+                'east': not agent_status['east'],
+                'west': not agent_status['east']     # Keep in sync with east
+            }
+            ctx.storage.set('agent_statuses', new_status)
+            # Send new signals to all agents
+            await send_signals_to_all_agents(ctx, next_time)
+        
+            ctx.storage.set('display_times', [])
+
+    except Exception as e:
+        ctx.logger.error(f'Error in processing agent response: {str(e)}')
 
 if __name__ == '__main__':
     control_agent.run()

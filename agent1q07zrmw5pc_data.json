@@ -5,5 +5,7 @@
         "east": false,
         "west": false
     },
-    "display_times": []
+    "display_times": [
+        28
+    ]
 }
