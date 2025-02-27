@@ -75,10 +75,10 @@ async def on_agent_call(ctx: Context, sender: str, msg: ControlRequest):
             # Switch signal states
             agent_status = ctx.storage.get('agent_statuses')
             new_status = {
-                'north': not agent_status['north'],
-                'south': not agent_status['north'],  # Keep in sync with north
-                'east': not agent_status['east'],
-                'west': not agent_status['east']     # Keep in sync with east
+                'north': not agent_status['north'], # type: ignore
+                'south': not agent_status['north'],  # Keep in sync with north # type: ignore
+                'east': not agent_status['east'], # type: ignore
+                'west': not agent_status['east']     # Keep in sync with east # type: ignore
             }
             ctx.storage.set('agent_statuses', new_status)
             # Send new signals to all agents

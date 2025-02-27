@@ -26,8 +26,8 @@ model = YOLO("yolov8n.pt")
 class_names = model.names
 
 # Configure Gemini (you'll need to set up your API key)
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
-gemini_model = genai.GenerativeModel('gemini-pro')
+genai.configure(api_key=os.getenv("GEMINI_API_KEY")) # type: ignore
+gemini_model = genai.GenerativeModel('gemini-pro') # type: ignore
 # Configure OpenAI
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
@@ -50,8 +50,8 @@ async def object_count(ctx: Context):
         for box in result.boxes:
             class_name = class_names[int(box.cls.item())]
             if class_name not in class_counts:
-                class_counts[class_name] = 0
-            class_counts[class_name] += 1
+                class_counts[class_name] = 0 # type: ignore
+            class_counts[class_name] += 1 # type: ignore
     
     detection_summary = ", ".join(f"{count} {class_name}" for class_name, count in class_counts.items() if count > 0)
     
@@ -85,7 +85,7 @@ async def get_gemini_response(prompt: str) -> str:
         temperature=0.7,
         max_tokens=10
     )
-    return response.choices[0].message.content.strip()
+    return response.choices[0].message.content.strip() # type: ignore
 
 @protocol.on_message(model=AgentCall)
 async def on_message(ctx: Context, sender: str, msg: AgentCall): 
